@@ -2,6 +2,8 @@
 
 These checks run against real WordPress APIs and a real database. They cover all four shortcodes, formatting and nested shortcodes, unsafe HTML, settings validation and legacy data, CSS registration and admin scope, and settings-page permissions. An independent sRGB luminance calculation also checks that every built-in text/background color pair has contrast of at least 4.5:1 for normal text.
 
+Version 1.2.0 adds coverage for the unified shortcode, optional headings and icons, malformed and unsafe attributes, legacy appearance, accessible icon equivalents, four preview examples, eight color picker fields, and admin-only script loading. The suite currently contains 428 assertions.
+
 Use a disposable WordPress installation with this plugin active, WP-CLI installed, and an administrator account:
 
 ```sh
@@ -32,3 +34,16 @@ After testing, remove only this project's containers and test data:
 ```sh
 docker compose -p simple-alert-box-review -f tests/compose.yaml down --volumes
 ```
+
+## Browser checks for the settings screen
+
+The PHP suite checks rendering and registration. Use a real browser to verify the JavaScript and color picker after changes:
+
+1. Open Alert Boxes. Check that all eight color pickers and four preview examples are present.
+2. Open a picker, select a palette swatch, and type a three-digit HEX color. Confirm the matching preview updates. The Default button must restore that field's default color.
+3. Choose equal text/background colors. Confirm the contrast warning shows 1.00:1. Choose contrasting colors and confirm the warning clears.
+4. Change padding, margin, and font size. Confirm all previews update, including zero spacing. Invalid or out-of-range input must not replace the last valid preview value.
+5. Reload without saving. Confirm the saved values are restored. Change a valid value, save, and confirm the success notice and persisted values after reload.
+6. View a public post with all four unified shortcode types, titles, links, and an original shortcode without attributes. Check that the old shortcode has no added header, all new icons/titles render, and preview JavaScript is absent.
+
+These steps were exercised locally for 1.2.0, along with the PHP checks. They are not automated browser tests in GitHub Actions.

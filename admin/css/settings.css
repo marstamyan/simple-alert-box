@@ -1,0 +1,46 @@
+.mk-alert-settings-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+	gap: 24px;
+	max-width: 1280px;
+	align-items: start;
+}
+.mk-alert-settings-layout form {
+	min-width: 0;
+}
+.mk-alert-preview {
+	position: sticky;
+	top: 50px;
+	max-height: calc(100vh - 80px);
+	overflow: auto;
+	box-sizing: border-box;
+	padding: 20px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	background: #fff;
+}
+.mk-alert-preview h2 {
+	margin-top: 0;
+}
+.mk-alert-preview .mk-simple-alert-box {
+	overflow-wrap: anywhere;
+}
+.mk-alert-preview [data-mk-preview-type] + [data-mk-preview-type] {
+	margin-top: 20px;
+}
+.mk-alert-preview .mk-alert-contrast {
+	margin: 8px 0 0;
+}
+.mk-alert-preview .mk-alert-contrast.is-low {
+	color: #8a2424;
+	font-weight: 600;
+}
+@media (max-width: 1100px) {
+	.mk-alert-settings-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.mk-alert-preview {
+		position: static;
+		max-height: none;
+	}
+}

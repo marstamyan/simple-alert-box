@@ -88,7 +88,28 @@ try {
 		mk_alert_test_assert( false !== strpos( do_shortcode( '[' . $tag . ']' ), 'mk-simple-alert-box-' . $type ), $tag . ' accepts empty content without warnings.' );
 		mk_alert_test_assert( false !== strpos( do_shortcode( '[' . $tag . ' /]' ), 'mk-simple-alert-box-' . $type ), $tag . ' accepts self-closing syntax without warnings.' );
 		mk_alert_test_assert( false !== strpos( do_shortcode( '[' . $tag . '][/' . $tag . ']' ), 'mk-simple-alert-box-' . $type ), $tag . ' accepts an empty enclosing pair without warnings.' );
+		mk_alert_test_assert( false === strpos( $html, 'mk-simple-alert-box-header' ), 'Legacy shortcodes keep their original appearance by default.' );
+		$html = do_shortcode( '[mk_alert type="' . $type . '" title="Заголовок &amp; text"]<strong>Body</strong>[/mk_alert]' );
+		mk_alert_test_assert( false !== strpos( $html, 'mk-simple-alert-box-' . $type . '"' ), 'Unified shortcode supports ' . $type . '.' );
+		mk_alert_test_assert( false !== strpos( $html, 'mk-simple-alert-box-title">Заголовок &amp; text</strong>' ), 'Titles support Unicode and entities.' );
+		mk_alert_test_assert( false !== strpos( $html, 'mk-simple-alert-box-icon" aria-hidden="true"' ), 'Decorative icons are hidden from assistive technology.' );
+		mk_alert_test_assert( false !== strpos( $html, 'mk-simple-alert-box-type">' ), 'An icon has a text equivalent for assistive technology.' );
+		$html = do_shortcode( '[' . $tag . ' title="Legacy title" icon="true"]Body[/' . $tag . ']' );
+		mk_alert_test_assert( false !== strpos( $html, 'Legacy title</strong>' ) && false !== strpos( $html, 'mk-simple-alert-box-icon' ), 'Legacy shortcodes support opt-in headings and icons.' );
 	}
+	foreach ( array( 'false', '0', 'no', 'off' ) as $disabled ) {
+		mk_alert_test_assert( false === strpos( do_shortcode( '[mk_alert icon="' . $disabled . '"]Body[/mk_alert]' ), 'mk-simple-alert-box-header' ), 'The icon can be disabled with ' . $disabled . '.' );
+	}
+	mk_alert_test_assert( false !== strpos( do_shortcode( '[mk_alert]' ), 'mk-simple-alert-box-info' ), 'The unified shortcode supports empty content and defaults to info.' );
+	mk_alert_test_assert( false !== strpos( do_shortcode( '[mk_alert type="not-a-type"]Body[/mk_alert]' ), 'mk-simple-alert-box-info' ), 'Unknown types safely fall back to info.' );
+	$html = mk_simple_alert_box_shortcode( array( 'type' => array(), 'title' => array(), 'icon' => array() ), null );
+	mk_alert_test_assert( false !== strpos( $html, 'mk-simple-alert-box-info' ), 'Malformed attribute types do not cause runtime errors.' );
+	$html = mk_simple_alert_box_shortcode( array( 'title' => '<img src=x onerror=alert(1)>Safe <b>title</b>', 'class' => 'injected', 'style' => 'display:none' ), 'Body' );
+	foreach ( array( '<img', 'onerror', '<b>', 'injected', 'display:none' ) as $unsafe ) {
+		mk_alert_test_assert( false === strpos( $html, $unsafe ), 'Unsafe or unsupported shortcode attributes are not rendered: ' . $unsafe );
+	}
+	$html = do_shortcode( '[mk_alert_info][mk_alert type="success" title="Nested"]Body[/mk_alert][/mk_alert_info]' );
+	mk_alert_test_assert( false !== strpos( $html, 'mk-simple-alert-box-icon" aria-hidden="true"' ), 'A nested unified alert retains its accessible icon.' );
 
 	add_shortcode( 'mk_alert_test_link', function () { return '<a href="https://example.com/">Nested link</a>'; } );
 	$html = do_shortcode( '[mk_alert_info][mk_alert_test_link][/mk_alert_info]' );
@@ -158,15 +179,19 @@ try {
 	// The enqueue hooks must work independently of shortcode location (widgets/templates included).
 	do_action( 'wp_enqueue_scripts' );
 	mk_alert_test_assert( wp_style_is( 'mk-simple-alert-box', 'enqueued' ), 'Frontend styles use the WordPress asset API.' );
+	mk_alert_test_assert( ! wp_script_is( 'mk-simple-alert-box-admin', 'enqueued' ), 'Preview JavaScript is not loaded on the frontend.' );
 	$inline = wp_styles()->get_data( 'mk-simple-alert-box', 'after' );
 	mk_alert_test_assert( is_array( $inline ) && false !== strpos( implode( '\n', $inline ), '#abc' ), 'Dynamic styles are attached to the registered stylesheet.' );
 	wp_dequeue_style( 'mk-simple-alert-box' );
 	set_current_screen( 'dashboard' );
 	do_action( 'admin_enqueue_scripts', 'dashboard' );
 	mk_alert_test_assert( ! wp_style_is( 'mk-simple-alert-box', 'enqueued' ), 'Other admin screens do not receive plugin styles.' );
+	mk_alert_test_assert( ! wp_script_is( 'mk-simple-alert-box-admin', 'enqueued' ), 'Other admin screens do not receive preview JavaScript.' );
 	set_current_screen( 'toplevel_page_mk-simple-alert-box' );
 	do_action( 'admin_enqueue_scripts', 'toplevel_page_mk-simple-alert-box' );
 	mk_alert_test_assert( wp_style_is( 'mk-simple-alert-box', 'enqueued' ), 'The settings screen receives its styles.' );
+	mk_alert_test_assert( wp_script_is( 'mk-simple-alert-box-admin', 'enqueued' ), 'The settings screen receives preview JavaScript.' );
+	mk_alert_test_assert( wp_style_is( 'wp-color-picker', 'enqueued' ), 'The settings screen uses the built-in WordPress color picker.' );
 
 	$administrators = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
 	mk_alert_test_assert( count( $administrators ) > 0, 'The disposable WordPress installation has an administrator.' );
@@ -176,6 +201,8 @@ try {
 	$page = ob_get_clean();
 	mk_alert_test_assert( false !== strpos( $page, 'action="options.php"' ), 'Settings submit through WordPress options.php.' );
 	mk_alert_test_assert( false !== strpos( $page, 'name="_wpnonce"' ), 'The settings form includes WordPress CSRF protection.' );
+	mk_alert_test_equal( 4, substr_count( $page, 'data-mk-preview-type=' ), 'All four alert types have a live preview.' );
+	mk_alert_test_equal( 8, substr_count( $page, 'class="mk-alert-color"' ), 'All eight color fields use the color picker.' );
 	foreach ( $settings as $name => $setting ) {
 		mk_alert_test_assert( false !== strpos( $page, 'name="' . $name . '"' ), 'The settings page includes ' . $name . '.' );
 		mk_alert_test_assert( (bool) preg_match( '/<label\b[^>]*for="' . preg_quote( $name, '/' ) . '"/', $page ), 'The settings field has a linked label: ' . $name );
