@@ -4,80 +4,77 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Add custom styles to the page dynamically
+/**
+ * Return CSS using validated values, including on sites upgraded from 1.0.
+ */
 function mk_simple_alert_box_get_dynamic_styles() {
-	$info_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_info_color', '#bfdcef' ) );
-	$warning_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_warning_color', '#f5eecb' ) );
-	$success_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_success_color', '#d1f2c4' ) );
-	$error_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_error_color', '#f0cccc' ) );
+	$padding   = mk_simple_alert_box_get_option( 'mk_simple_alert_box_padding' );
+	$margin    = mk_simple_alert_box_get_option( 'mk_simple_alert_box_margin' );
+	$font_size = mk_simple_alert_box_get_option( 'mk_simple_alert_box_font_size' );
+	$css       = ".mk-simple-alert-box {
+		box-sizing: border-box;
+		padding: {$padding}px;
+		margin: {$margin}px 0;
+		font-size: {$font_size}px;
+		border-inline-start: 5px solid;
+		box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+	}
+	.mk-simple-alert-box > :first-child {
+		margin-top: 0;
+	}
+	.mk-simple-alert-box > :last-child {
+		margin-bottom: 0;
+	}";
 
-	$info_text_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_info_text_color', '#457389' ) );
-	$warning_text_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_warning_text_color', '#8a6d3b' ) );
-	$success_text_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_success_text_color', '#3c763d' ) );
-	$error_text_color = sanitize_hex_color( get_option( 'mk_simple_alert_box_error_text_color', '#a94442' ) );
+	$borders = array( 'info' => '#31708f', 'warning' => '#b88d42', 'success' => '#53a354', 'error' => '#db5552' );
+	foreach ( $borders as $type => $border ) {
+		$background = mk_simple_alert_box_get_option( 'mk_simple_alert_box_' . $type . '_color' );
+		$text       = mk_simple_alert_box_get_option( 'mk_simple_alert_box_' . $type . '_text_color' );
+		$css       .= "\n.mk-simple-alert-box-{$type} {
+			background-color: {$background};
+			color: {$text};
+			border-color: {$border};
+		}";
+	}
 
-	$padding = intval( get_option( 'mk_simple_alert_box_padding', '10' ) );
-	$margin = intval( get_option( 'mk_simple_alert_box_margin', '10' ) );
-	$font_size = intval( get_option( 'mk_simple_alert_box_font_size', '16' ) );
-
-	// Generate CSS styles for the alert boxes
-	$custom_css = "
-    .mk-simple-alert-box {
-        padding: {$padding}px;
-        margin: {$margin}px 0;
-        font-size: {$font_size}px;
-        border-left: 5px solid;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .mk-simple-alert-box-info {
-        background-color: {$info_color};
-        color: {$info_text_color};
-        border-color: #31708f;
-    }
-    .mk-simple-alert-box-warning {
-        background-color: {$warning_color};
-        color: {$warning_text_color};
-        border-color: #b88d42;
-    }
-    .mk-simple-alert-box-success {
-        background-color: {$success_color};
-        color: {$success_text_color};
-        border-color: #53a354;
-    }
-    .mk-simple-alert-box-error {
-        background-color: {$error_color};
-        color: {$error_text_color};
-        border-color: #db5552;
-    }";
-
-	// Output the styles in the page header
-	echo '<style>' . $custom_css . '</style>';
+	return $css;
 }
 
-// Add the custom styles to the <head> of the page
-add_action( 'wp_head', 'mk_simple_alert_box_get_dynamic_styles' );
+function mk_simple_alert_box_enqueue_styles() {
+	if ( wp_style_is( 'mk-simple-alert-box', 'enqueued' ) ) {
+		return;
+	}
 
-// Shortcodes
+	wp_register_style( 'mk-simple-alert-box', false, array(), MK_SIMPLE_ALERT_BOX_VERSION );
+	wp_enqueue_style( 'mk-simple-alert-box' );
+	wp_add_inline_style( 'mk-simple-alert-box', mk_simple_alert_box_get_dynamic_styles() );
+}
+// Load on all frontend pages so alerts in widgets and templates are covered too.
+add_action( 'wp_enqueue_scripts', 'mk_simple_alert_box_enqueue_styles' );
+
+function mk_simple_alert_box_render( $type, $content ) {
+	$content = is_string( $content ) ? $content : '';
+	// Repair paragraph fragments from the classic editor, and format raw block content.
+	$content = shortcode_unautop( wpautop( $content ) );
+	return '<div class="mk-simple-alert-box mk-simple-alert-box-' . esc_attr( $type ) . '">' . wp_kses_post( do_shortcode( $content ) ) . '</div>';
+}
+
 function mk_simple_alert_boxes_info_shortcode( $atts, $content = null ) {
-	return '<div class="mk-simple-alert-box mk-simple-alert-box-info">' . esc_html( do_shortcode( $content ) ) . '</div>';
+	return mk_simple_alert_box_render( 'info', $content );
 }
-
 add_shortcode( 'mk_alert_info', 'mk_simple_alert_boxes_info_shortcode' );
 
 function mk_simple_alert_boxes_warning_shortcode( $atts, $content = null ) {
-	return '<div class="mk-simple-alert-box mk-simple-alert-box-warning">' . esc_html( do_shortcode( $content ) ) . '</div>';
+	return mk_simple_alert_box_render( 'warning', $content );
 }
-
 add_shortcode( 'mk_alert_warning', 'mk_simple_alert_boxes_warning_shortcode' );
 
 function mk_simple_alert_boxes_success_shortcode( $atts, $content = null ) {
-	return '<div class="mk-simple-alert-box mk-simple-alert-box-success">' . esc_html( do_shortcode( $content ) ) . '</div>';
+	return mk_simple_alert_box_render( 'success', $content );
 }
-
 add_shortcode( 'mk_alert_success', 'mk_simple_alert_boxes_success_shortcode' );
 
 function mk_simple_alert_boxes_error_shortcode( $atts, $content = null ) {
-	return '<div class="mk-simple-alert-box mk-simple-alert-box-error">' . esc_html( do_shortcode( $content ) ) . '</div>';
+	return mk_simple_alert_box_render( 'error', $content );
 }
-
 add_shortcode( 'mk_alert_error', 'mk_simple_alert_boxes_error_shortcode' );

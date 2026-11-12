@@ -1,0 +1,60 @@
+name: Plugin checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '7.4'
+            wordpress: '6.0'
+          - php: '8.3'
+            wordpress: latest
+          - php: '8.5'
+            wordpress: latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: wordpress
+          MYSQL_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --password=wordpress --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      WP_PATH: ${{ runner.temp }}/wordpress
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, mbstring
+          coverage: none
+          tools: wp-cli
+      - name: Check PHP syntax
+        run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Install disposable WordPress
+        run: |
+          wp core download --path="$WP_PATH" --version="${{ matrix.wordpress }}"
+          wp config create --path="$WP_PATH" --dbname=wordpress --dbuser=root --dbpass=wordpress --dbhost=127.0.0.1 --extra-php <<'PHP'
+          define( 'WP_DEBUG', true );
+          define( 'WP_DEBUG_DISPLAY', true );
+          PHP
+          wp core install --path="$WP_PATH" --url=http://localhost --title='Plugin tests' --admin_user=test-admin --admin_password='local-tests-only' --admin_email=tests@example.com --skip-email
+          ln -s "$GITHUB_WORKSPACE" "$WP_PATH/wp-content/plugins/simple-alert-box"
+          wp plugin activate simple-alert-box --path="$WP_PATH"
+      - name: Run integration checks
+        run: MK_ALERT_TESTS=1 wp eval-file "$GITHUB_WORKSPACE/tests/integration.php" --use-include --path="$WP_PATH"
