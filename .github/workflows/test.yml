@@ -34,10 +34,10 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
-    env:
-      WP_PATH: ${{ runner.temp }}/wordpress
     steps:
       - uses: actions/checkout@v4
+      - name: Set WordPress test path
+        run: echo "WP_PATH=$RUNNER_TEMP/wordpress" >> "$GITHUB_ENV"
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
